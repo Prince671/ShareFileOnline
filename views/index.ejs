@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>File Upload - Premium Experience</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    * {
+      font-family: 'Inter', sans-serif;
+    }
+
+    .gradient-bg {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .glow-effect {
+      box-shadow: 0 0 30px rgba(102, 126, 234, 0.3);
+    }
+
+    .upload-zone {
+      transition: all 0.3s;
+    }
+
+    .upload-zone:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .upload-zone.drag-over {
+      background: rgba(102, 126, 234, 0.1);
+      border-color: #667eea;
+      transform: scale(1.02);
+    }
+
+    .bounce-in {
+      animation: bounceIn 0.6s ease-out;
+    }
+
+    @keyframes bounceIn {
+      0% {
+        transform: scale(0.3);
+        opacity: 0;
+      }
+
+      50% {
+        transform: scale(1.05);
+      }
+
+      70% {
+        transform: scale(0.9);
+      }
+
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .floating {
+      animation: floating 3s ease-in-out infinite;
+    }
+
+    @keyframes floating {
+      0%,
+      100% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+    }
+
+    .loader-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+
+    .loader {
+      border: 8px solid rgba(255, 255, 255, 0.2);
+      border-top: 8px solid #ffffff;
+      border-radius: 50%;
+      width: 70px;
+      height: 70px;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+  </style>
+</head>
+
+<body class="gradient-bg min-h-screen flex items-center justify-center p-4 relative">
+
+  <!-- Page Load Loader -->
+  <div id="pageLoader" class="loader-overlay">
+    <div class="loader"></div>
+  </div>
+
+  <!-- Upload Loader -->
+  <div id="uploadLoader" class="loader-overlay hidden">
+    <div class="loader"></div>
+  </div>
+
+  <!-- Background Particles -->
+  <div class="fixed inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute top-20 left-20 w-2 h-2 bg-white opacity-30 rounded-full floating"></div>
+    <div class="absolute top-40 right-32 w-3 h-3 bg-white opacity-20 rounded-full floating" style="animation-delay: 1s;"></div>
+    <div class="absolute bottom-32 left-16 w-2 h-2 bg-white opacity-25 rounded-full floating" style="animation-delay: 2s;"></div>
+    <div class="absolute bottom-20 right-20 w-4 h-4 bg-white opacity-15 rounded-full floating" style="animation-delay: 0.5s;"></div>
+  </div>
+
+  <!-- Main Container -->
+  <div class="w-full max-w-lg mx-auto fade-in">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-white mb-2">Upload Files</h1>
+      <p class="text-white/80 text-lg">Drag & drop your files or click to browse</p>
+    </div>
+
+    <!-- Upload Form -->
+    <form id="uploadForm" action="/upload" method="POST" enctype="multipart/form-data"
+      class="glass-effect rounded-2xl p-8 glow-effect">
+      <!-- Upload Zone -->
+      <div id="uploadZone"
+        class="upload-zone block border-2 border-dashed border-white/30 rounded-xl p-12 text-center cursor-pointer mb-6">
+        <div class="text-6xl mb-4">📁</div>
+        <h3 class="text-xl font-semibold text-white mb-2">Drop your files here</h3>
+        <p class="text-white/70 mb-4">or click to browse from your device</p>
+        <input id="fileInput" type="file" name="uploadedFile" class="hidden" multiple />
+        <span
+          class="inline-block bg-white text-purple-600 px-6 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors duration-200">
+          Choose Files
+        </span>
+      </div>
+
+      <!-- File List Preview -->
+      <div id="fileList" class="space-y-3 mb-6 hidden">
+        <div id="fileItems" class="space-y-2"></div>
+      </div>
+
+      <!-- Submit Button -->
+      <button type="submit"
+        class="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-3 px-6 rounded-lg font-medium hover:from-purple-600 hover:to-pink-600 transition-all duration-200 transform hover:scale-105">
+        Start Upload
+      </button>
+    </form>
+  </div>
+
+  <!-- Script -->
+  <script>
+    class FileUploader {
+      constructor() {
+        this.files = [];
+        this.uploadZone = document.getElementById('uploadZone');
+        this.fileInput = document.getElementById('fileInput');
+        this.fileList = document.getElementById('fileList');
+        this.fileItems = document.getElementById('fileItems');
+        this.initListeners();
+      }
+
+      initListeners() {
+        this.uploadZone.addEventListener('click', () => this.fileInput.click());
+
+        this.fileInput.addEventListener('change', e => {
+          this.handleFiles([...e.target.files]);
+        });
+
+        this.uploadZone.addEventListener('dragover', e => {
+          e.preventDefault();
+          this.uploadZone.classList.add('drag-over');
+        });
+
+        this.uploadZone.addEventListener('dragleave', () => {
+          this.uploadZone.classList.remove('drag-over');
+        });
+
+        this.uploadZone.addEventListener('drop', e => {
+          e.preventDefault();
+          this.uploadZone.classList.remove('drag-over');
+          this.handleFiles([...e.dataTransfer.files]);
+        });
+      }
+
+      handleFiles(newFiles) {
+        this.files = [...this.files, ...newFiles];
+        this.renderFileList();
+      }
+
+      renderFileList() {
+        this.fileItems.innerHTML = '';
+        this.files.forEach((file, index) => {
+          const el = document.createElement('div');
+          el.className = 'bg-white/10 rounded-lg p-3 flex items-center justify-between bounce-in text-white';
+          el.style.animationDelay = `${index * 0.1}s`;
+          el.innerHTML = `
+            <div class="flex items-center">
+              <div class="text-2xl mr-3">${this.getFileIcon(file.type)}</div>
+              <div>
+                <p class="font-medium">${file.name}</p>
+                <p class="text-sm text-white/70">${this.formatSize(file.size)}</p>
+              </div>
+            </div>
+            <button onclick="uploader.removeFile(${index})" class="text-white/60 hover:text-white">✕</button>
+          `;
+          this.fileItems.appendChild(el);
+        });
+        this.fileList.classList.remove('hidden');
+      }
+
+      formatSize(bytes) {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+      }
+
+      getFileIcon(type) {
+        if (type.startsWith('image/')) return '🖼️';
+        if (type.startsWith('video/')) return '🎥';
+        if (type.startsWith('audio/')) return '🎵';
+        if (type.includes('pdf')) return '📄';
+        if (type.includes('word')) return '📝';
+        if (type.includes('excel')) return '📊';
+        return '📁';
+      }
+
+      removeFile(index) {
+        this.files.splice(index, 1);
+        this.renderFileList();
+        if (this.files.length === 0) {
+          this.fileList.classList.add('hidden');
+        }
+      }
+
+      hasFiles() {
+        return this.files.length > 0;
+      }
+    }
+
+    const uploader = new FileUploader();
+
+    // Page load loader
+    window.addEventListener('load', () => {
+      setTimeout(() => {
+        document.getElementById('pageLoader').style.display = 'none';
+      }, 1000);
+    });
+
+    // Upload form handler
+    const form = document.getElementById('uploadForm');
+    const uploadLoader = document.getElementById('uploadLoader');
+
+    form.addEventListener('submit', (e) => {
+      if (!uploader.hasFiles()) {
+        e.preventDefault();
+        alert('Please select at least one file before uploading.');
+        return;
+      }
+      uploadLoader.classList.remove('hidden');
+    });
+  </script>
+</body>
+
+</html>
